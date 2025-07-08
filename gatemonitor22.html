@@ -14,6 +14,12 @@
     .tab-content { display:none; padding:20px; min-height:400px; }
     .tab-content.active { display:block; }
     .gate-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:10px; }
+#allGatesTab .gate-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 10px;
+}
     .gate-item { padding:15px; border-radius:5px; text-align:center; font-weight:bold; color:#fff; cursor:pointer; transition:transform .1s; }
     .gate-item:hover { transform:scale(1.05); }
     .gate-item.active { background:#28a745; }
@@ -61,6 +67,16 @@
     .flight-type-btn { flex:1; padding:8px; border:2px solid #007bff; background:#fdfdff; color:#007bff; cursor:pointer; border-radius:5px; font-size:14px; font-weight:bold; }
     .flight-type-btn.active { background:#007bff; color:#fff; border-color:#007bff; }
     .convert-departure-form { margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:10px; background:#e9ecef; border-radius:5px; }
+    .action-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+    }
+    .action-buttons button {
+      width: 100%;
+      padding: 12px 0;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
@@ -142,7 +158,6 @@
     function addMinutes(s,mins) { return minutesToTime(timeToMinutes(s)+mins); }
 
     function showMonitoringPopup(id,type,time){
-	playSound();
       const p=document.createElement('div');p.className='monitoring-popup';
       p.innerHTML=`<span class='close-btn'>&times;</span>${id} ${type.charAt(0).toUpperCase()+type.slice(1)} ${time} – overvågning begynder nu`;
       document.body.append(p);
