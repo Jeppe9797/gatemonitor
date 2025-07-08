@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gate Overvågning</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:Arial,sans-serif; background:#f0f0f0; padding:10px; }
+    .container { max-width:100%; margin:0 auto; background:#fff; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); overflow:hidden; }
+    .tabs { display:flex; background:#333; }
+    .tab { flex:1; padding:15px; text-align:center; color:#fff; cursor:pointer; background:#333; border:none; font-size:14px; }
+    .tab.active { background:#007bff; }
+    .tab-content { display:none; padding:20px; min-height:400px; }
+    .tab-content.active { display:block; }
+    .gate-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:10px; }
+    .gate-item { padding:15px; border-radius:5px; text-align:center; font-weight:bold; color:#fff; cursor:pointer; transition:transform .1s; }
+    .gate-item:hover { transform:scale(1.05); }
+    .gate-item.active { background:#28a745; }
+    .gate-item.waiting { background:#ffc107; color:#000; }
+    .gate-item.scheduled { background:#007bff; }
+    .gate-item.inactive { background:#dc3545; }
+    .gate-item .timer { font-size:12px; margin-top:5px; }
+    ul.priority-list { list-style:none; padding:0; }
+    li.priority-item { display:flex; justify-content:space-between; align-items:center; background:#f8f9fa; border:2px solid #ddd; border-radius:5px; padding:15px; margin-bottom:10px; gap:15px; }
+    li.priority-item.active { border-color:#28a745; background:#d4edda; }
+    li.priority-item.waiting { border-color:#ffc107; background:#fff3cd; }
+    li.priority-item.completed { border-color:#dc3545; background:#f8d7da; }
+    .gate-info { flex:1; }
+    .gate-name { font-size:18px; margin-bottom:5px; }
+    .gate-timer { font-size:16px; font-weight:bold; color:#007bff; }
+    .action-buttons button,
+    .screen-btn,
+    .add-btn { padding:8px 12px; border:none; border-radius:5px; cursor:pointer; font-size:14px; margin-left:5px; }
+    .add-btn { background:#28a745; color:#fff; }
+    .add-btn:hover { background:#218838; }
+    .reset-btn { background:#dc3545; color:#fff; padding:8px 12px; border:none; border-radius:5px; cursor:pointer; font-size:14px; margin-top:20px; }
+    .reset-btn:hover { background:#c82333; }
+    .delete-btn { background:#ffc107; color:#000; }
+    .delete-btn:hover { background:#e0a800; }
+    .finish-btn { background:#6c757d; color:#fff; }
+    .finish-btn:hover { background:#5a6268; }
+    .convert-btn { background:#17a2b8; color:#fff; }
+    .convert-btn:hover { background:#138496; }
+    .screen-btn { background:#f8f9fa; color:#333; border:2px solid #ddd; }
+    .screen-btn.active { background:#007bff; color:#fff; border-color:#007bff; }
+    .screen-btn:hover { background:#e2e6ea; }
+    .monitoring-popup { position:fixed; bottom:20px; right:20px; background:#28a745; color:#fff; padding:15px; border-radius:5px; box-shadow:0 2px 6px rgba(0,0,0,0.2); z-index:1002; }
+    .monitoring-popup .close-btn { margin-left:10px; cursor:pointer; font-weight:bold; }
+    .notification { position:fixed; top:20px; right:20px; background:#ff9800; color:#fff; padding:20px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:1000; max-width:300px; }
+    .notification button { background:#fff; color:#ff9800; border:2px solid #ff9800; padding:8px 16px; margin-top:10px; border-radius:5px; }
+    #userDisplay { position:fixed; bottom:10px; left:10px; background:rgba(0,0,0,0.1); padding:5px 10px; border-radius:5px; font-size:14px; }
+    .modal { display:none; position:fixed; z-index:1001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); }
+    .modal-content { background:#fff; margin:15% auto; padding:20px; width:90%; max-width:500px; border-radius:10px; position:relative; box-shadow:0 5px 15px rgba(0,0,0,0.3); }
+    .modal-close-btn { position:absolute; top:10px; right:20px; font-size:28px; color:#aaa; cursor:pointer; }
+    .modal-close-btn:hover { color:#000; }
+    .form-group { margin-bottom:15px; }
+    label { display:block; margin-bottom:5px; font-weight:bold; }
+    input[type=text] { width:100%; padding:8px; border:2px solid #ddd; border-radius:5px; font-size:16px; }
+    .flight-type-selector { display:flex; gap:10px; margin-bottom:10px; }
+    .flight-type-btn { flex:1; padding:8px; border:2px solid #007bff; background:#fdfdff; color:#007bff; cursor:pointer; border-radius:5px; font-size:14px; font-weight:bold; }
+    .flight-type-btn.active { background:#007bff; color:#fff; border-color:#007bff; }
+    .convert-departure-form { margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:10px; background:#e9ecef; border-radius:5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab(0)">Prioriteret</button>
+      <button class="tab" onclick="showTab(1)">Alle Gates</button>
+    </div>
+    <!-- Prioriteret -->
+    <div class="tab-content active" id="priorityTab">
+      <ul id="priorityList" class="priority-list"></ul>
+      <div id="delegatedListContainer"></div>
+      <div id="completedListContainer"></div>
+    </div>
+    <!-- Alle Gates -->
+    <div class="tab-content" id="allGatesTab">
+      <div id="allGates" class="gate-grid"></div>
+      <button class="reset-btn" onclick="resetAll()">Nulstil alt</button>
+    </div>
+  </div>
+  <div id="userDisplay"></div>
+  <div id="gateModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close-btn" onclick="closeModal()">×</span>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    // Init Firebase
+    const firebaseConfig = { apiKey:"AIzaSyDQE57o9SIdmGzE5vcPygrJmdob2PiN0tw", authDomain:"gatemonitor-sk.firebaseapp.com", projectId:"gatemonitor-sk", storageBucket:"gatemonitor-sk.firebasestorage.app", messagingSenderId:"739242043690", appId:"1:739242043690:web:84a6d7fbadf6e9b356d653", measurementId:"G-9FWYXL4B5H" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Brugernavn i cookie
+    function getUsername() {
+      const m = document.cookie.match(/(?:^|; )username=([^;]+)/);
+      if (m) return decodeURIComponent(m[1]);
+      let n = prompt("Indtast dit navn:");
+      if (!n) n = "ukendt";
+      document.cookie = `username=${encodeURIComponent(n)}; max-age=${3*3600}; path=/`;
+      return n;
+    }
+    document.getElementById('userDisplay').textContent = `Bruger: ${getUsername()}`;
+
+    const gatesBySection = {
+      A:['A4','A6','A7','A8','A9','A10','A11','A12','A13','A14','A15','A18','A20','A21','A25','A26','A27','A30'],
+      B:['B4','B5','B6','B7','B8','B9','B10','B15','B19'],
+      C:['C27','C30'],
+      D:['D1','D2','D3','D4'],
+      E:['E20','E22','E24']
+    };
+    let gates = {}, timers = {};
+    const col = db.collection('sharedGates');
+    const setGate = (id,data) => col.doc(id).set(data);
+    const updGate = (id,fields) => col.doc(id).update(fields);
+    const delGate = id => col.doc(id).delete();
+
+    function showTab(i) {
+      document.querySelectorAll('.tab').forEach((t,idx)=>t.classList.toggle('active',idx===i));
+      document.querySelectorAll('.tab-content').forEach((c,idx)=>c.classList.toggle('active',idx===i));
+    }
+
+    function autoFormatTime(e) {
+      let v = e.target.value.replace(/\D/g,'');
+      if (v.length>4) v=v.slice(0,4);
+      if (v.length>2) v=v.slice(0,2)+':'+v.slice(2);
+      e.target.value = v;
+    }
+    document.body.addEventListener('input', e => {
+      if (['flightTime','modalFlightTime'].includes(e.target.id) || e.target.id.startsWith('newTime_')) {
+        autoFormatTime(e);
+      }
+    });
+
+    function timeToMinutes(s) { const [h,m]=s.split(':').map(Number); return h*60+m; }
+    function minutesToTime(m) { m=(m%(24*60)+24*60)%(24*60); return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+    function addMinutes(s,mins) { return minutesToTime(timeToMinutes(s)+mins); }
+
+    function showMonitoringPopup(id,type,time){
+	playSound();
+      const p=document.createElement('div');p.className='monitoring-popup';
+      p.innerHTML=`<span class='close-btn'>&times;</span>${id} ${type.charAt(0).toUpperCase()+type.slice(1)} ${time} – overvågning begynder nu`;
+      document.body.append(p);
+      p.querySelector('.close-btn').onclick=()=>p.remove();
+      setTimeout(()=>p.remove(),4000);
+    }
+    function playSound(){ try{const ac=new (window.AudioContext||window.webkitAudioContext)(),o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.frequency.value=800; o.type='sine';
+      g.gain.setValueAtTime(0.3,ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.5);
+      o.start(ac.currentTime); o.stop(ac.currentTime+0.5);
+    }catch{} }
+    function showDepartureNotif(msg){ playSound(); const n=document.createElement('div'); n.className='notification';
+      n.innerHTML=`<strong>Notifikation</strong><br>${msg}<br><button onclick="this.parentNode.remove()">Luk</button>`;
+      document.body.append(n);
+    }
+
+    function setupGateTimer(id,d){
+      if(timers[id]) clearInterval(timers[id]);
+      async function chk(){
+        const now=new Date(),cm=now.getHours()*60+now.getMinutes(),ms=timeToMinutes(d.monitorTime);
+        if(cm>=ms && !d.notifiedMonitoring){ showMonitoringPopup(id,d.type,d.time); await updGate(id,{notifiedMonitoring:true,status:'monitoring'}); }
+        if(d.type==='arrival'){ const am=timeToMinutes(d.time);
+          if(cm>=am+35 && !d.notifiedDeparture){ showDepartureNotif(`Gate ${id}: opdatér med departure tidspunkt`); await updGate(id,{notifiedDeparture:true,status:'waiting_departure'}); }
+        }
+        if(d.type==='departure'){ const dm=timeToMinutes(d.time);
+          if(cm>=dm && !d.completedAt){ await updGate(id,{status:'completed',completedAt:new Date()}); }
+        }
+      }
+      chk(); timers[id]=setInterval(chk,30000);
+    }
+
+    function initRealtime(){
+      col.onSnapshot(s=>{
+        gates={}; s.forEach(doc=>gates[doc.id]=doc.data());
+        Object.keys(timers).forEach(id=>{ if(!gates[id]){ clearInterval(timers[id]); delete timers[id]; }});
+        Object.entries(gates).forEach(([id,d])=>{ if(!timers[id]) setupGateTimer(id,d); });
+        renderAll();
+      });
+    }
+
+    function renderAll(){ renderPriority(); renderGates(); }
+    function renderGates(){
+      const c=document.getElementById('allGates'); c.innerHTML='';
+      for(const [sec,list] of Object.entries(gatesBySection)){
+        const box=document.createElement('div'); box.className='section'; box.innerHTML=`<h3>${sec}-sektion</h3>`;
+        const grid=document.createElement('div'); grid.className='gate-grid';
+        list.forEach(id=>{
+          const it=document.createElement('div'); it.className='gate-item'; it.dataset.gateId=id;
+          const gd=gates[id]; let txt='';
+          if(gd){
+            it.classList.add(gd.status==='monitoring'?'active':gd.status==='waiting_departure'?'waiting':gd.status==='scheduled'?'scheduled':'inactive');
+            if(gd.status==='monitoring') txt=`${gd.type==='arrival'?'Arr':'Dep'} ${gd.time}`;
+            else if(gd.status==='waiting_departure') txt='Venter…';
+            else{ const m=timeToMinutes(gd.monitorTime)-((new Date()).getHours()*60+(new Date()).getMinutes()); txt=m>0?`${m} min`:'Starter nu'; }
+            it.innerHTML=`<div>${id}</div><div class='timer'>${txt}</div>`;
+          } else { it.classList.add('inactive'); it.innerHTML=`<div>${id}</div>`; }
+          grid.append(it);
+        });
+        c.appendChild(box); box.appendChild(grid);
+      }
+    }
+    function renderPriority(){
+      const ct=document.getElementById('priorityList'),dc=document.getElementById('delegatedListContainer'),cc=document.getElementById('completedListContainer');
+      ct.innerHTML=''; dc.innerHTML=''; cc.innerHTML='';
+      const now=Date.now(),act=[],delg=[],comp=[];
+      Object.entries(gates).forEach(([id,d])=>{
+        if(d.completedAt && (now-d.completedAt.toDate().getTime())<=3600*1000) comp.push([id,d]);
+        else if(d.screen==='delegated') delg.push([id,d]);
+        else act.push([id,d]);
+      });
+      const ord={'monitoring':1,'waiting_departure':2,'scheduled':3,'completed':4};
+      act.sort((a,b)=>ord[a[1].status]-ord[b[1].status]); delg.sort((a,b)=>ord[a[1].status]-ord[b[1].status]);
+      function mk(id,d){
+        const li=document.createElement('li'); li.className='priority-item';
+        if(d.status==='monitoring') li.classList.add('active');
+        if(d.status==='waiting_departure') li.classList.add('waiting');
+        if(d.status==='completed') li.classList.add('completed');
+        const typeTxt=d.type==='arrival'?'ARRIVAL':'DEPARTURE';
+        let btns=`<button class='delete-btn' onclick="delGate('${id}')">Slet</button>`;
+        if(d.status!=='completed'){
+          if(d.type==='arrival') btns+=`<button class='convert-btn' onclick="showConvertToDepartureUI('${id}',this)">Til Dep</button>`;
+          btns+=`<button class='add-btn' onclick="onPlus5('${id}')">+5 min</button><button class='finish-btn' onclick="onFinish('${id}')">Færdig</button>`;
+        }
+        const screenBtns=[{v:'1',t:'1'},{v:'2',t:'2'},{v:'3',t:'3'},{v:'4',t:'4'},{v:'delegated',t:'UA'}]
+          .map(o=>`<button class='screen-btn ${d.screen===o.v?'active':''}' onclick="updGate('${id}',{screen:'${o.v}'})">${o.t}</button>`).join('');
+        let timerTxt='';
+        if(d.status==='monitoring') timerTxt=`Aktiv til ${minutesToTime(timeToMinutes(d.monitorTime)+(d.type==='arrival'?15+d.monitoringExtension:0))}`;
+        else if(d.status==='waiting_departure') timerTxt='Venter på dep.';
+        else if(d.status==='completed') timerTxt=`Færdig kl. ${new Date(d.completedAt.toDate()).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})}`;
+        else{ const m=timeToMinutes(d.monitorTime)-((new Date()).getHours()*60+(new Date()).getMinutes()); timerTxt=m>0?`Starter om ${m} min`:'Starter nu'; }
+        li.innerHTML=`<div class='gate-info'><div class='gate-name'>${id} (${typeTxt} ${d.time})</div><div class='gate-details'>${screenBtns}</div></div><div class='gate-timer'>${timerTxt}</div><div class='action-buttons'>${btns}</div>`;
+        return li;
+      }
+      act.forEach(x=>ct.append(mk(...x)));
+      if(delg.length){ dc.innerHTML=`<h3>Udelegeret Ansvar</h3>`; const ul=document.createElement('ul'); ul.className='priority-list'; delg.forEach(x=>ul.append(mk(...x))); dc.append(ul); }
+      if(comp.length){ cc.innerHTML=`<h3>Færdiggjort (1 t)</h3>`; const ul=document.createElement('ul'); ul.className='priority-list'; comp.forEach(x=>ul.append(mk(...x))); cc.append(ul); }
+    }
+    function onPlus5(id){ const d=gates[id],ext=(d.monitoringExtension||0)+5,upd={monitoringExtension:ext}; if(d.type==='departure'){const nt=addMinutes(d.time,5);upd.time=nt;upd.monitorTime=addMinutes(d.monitorTime,5);} updGate(id,upd); }
+    function onFinish(id){ updGate(id,{status:'completed',completedAt:new Date()}); }
+    function showConvertToDepartureUI(id,btn){ btn.style.display='none'; const c=`<div class='convert-departure-form'><input type='text' id='newTime_${id}' placeholder='HHMM' inputmode='numeric' maxlength='5'><button class='add-btn' onclick="updateToDep('${id}')">Opdater</button></div>`; document.getElementById(id+'_convert')?.remove(); btn.insertAdjacentHTML('afterend',`<div id='${id}_convert'>${c}</div>`);}    
+    function updateToDep(id){ const inp=document.getElementById('newTime_'+id),v=inp.value; if(v.length===4&&!v.includes(':')) inp.value=v.slice(0,2)+':'+v.slice(2); if(!/\d{2}:\d{2}/.test(inp.value)){alert('HH:MM');return;} const mon=addMinutes(inp.value,-25); updGate(id,{type:'departure',time:inp.value,monitorTime:mon,status:'scheduled',notifiedMonitoring:false,notifiedDeparture:false,monitoringExtension:0,completedAt:null}); }
+    function resetAll(){ if(confirm('Slet alle gates i databasen?')){ col.get().then(s=>{ const b=db.batch(); s.forEach(d=>b.delete(d.ref)); b.commit(); }); }}
+    function showAddGateModal(id){ const mb=document.getElementById('modalBody'); mb.innerHTML=`<h3>Tilføj fly til Gate ${id}</h3>
+      <form id='modalGateForm'>
+        <div class='form-group'><label>Type:</label><div class='flight-type-selector'><button type='button' class='flight-type-btn' data-value='arrival'>Arrival</button><button type='button' class='flight-type-btn' data-value='departure'>Departure</button></div><input type='hidden' id='modalFlightType'></div>
+        <div class='form-group'><label>Tidspunkt:</label><input type='text' id='modalFlightTime' placeholder='HHMM'></div>
+        <div class='form-group'><label>Skærm:</label><div class='gate-details'><button type='button' class='screen-btn' data-value='1'>1</button><button type='button' class='screen-btn' data-value='2'>2</button><button type='button' class='screen-btn' data-value='3'>3</button><button type='button' class='screen-btn' data-value='4'>4</button><button type='button' class='screen-btn' data-value='delegated'>UA</button></div><input type='hidden' id='modalScreenNumber'></div>
+        <button type='submit' class='add-btn'>Tilføj</button>
+      </form>`;
+ mb.querySelectorAll('.flight-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mb.querySelector('#modalFlightType').value = btn.dataset.value;
+      mb.querySelectorAll('.flight-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  mb.querySelectorAll('.screen-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      mb.querySelector('#modalScreenNumber').value = btn.dataset.value;
+      mb.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+      document.getElementById('modalGateForm').addEventListener('submit',e=>{ e.preventDefault(); const ft=document.getElementById('modalFlightType').value, ti=document.getElementById('modalFlightTime').value, sc=document.getElementById('modalScreenNumber').value; if(!/\d{2}:\d{2}/.test(ti)) alert('HH:MM'); else{ const mon=ft==='arrival'?addMinutes(ti,4):addMinutes(ti,-25); setGate(id,{type:ft,time:ti,monitorTime:mon,screen:sc,status:'scheduled',notifiedMonitoring:false,notifiedDeparture:false,monitoringExtension:0,completedAt:null}); closeModal(); }});
+      document.getElementById('gateModal').style.display='block'; }
+    function showGateInfoModal(id,d){ const mb=document.getElementById('modalBody'); let st=d.type==='arrival'?'Arrival':'Departure', sc=d.screen==='delegated'?'Udelegeret':d.screen?`Skærm ${d.screen}`:'Ingen'; mb.innerHTML=`<h3>Gate ${id} - Info</h3><div><p><strong>Type:</strong> ${st}</p><p><strong>Tid:</strong> ${d.time}</p><p><strong>Start:</strong> ${d.monitorTime}</p><p><strong>Tildelt:</strong> ${sc}</p></div>`; document.getElementById('gateModal').style.display='block'; }
+    function closeModal(){ document.getElementById('gateModal').style.display='none'; }
+    document.getElementById('allGates').addEventListener('click',e=>{ const el=e.target.closest('.gate-item'); if(!el) return; const id=el.dataset.gateId; gates[id]?showGateInfoModal(id,gates[id]):showAddGateModal(id); });
+    document.addEventListener('DOMContentLoaded',()=>{ initRealtime(); });
+  </script>
+</body>
+</html>
