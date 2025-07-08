@@ -192,7 +192,7 @@ function showDepartureNotif(msg) {
         const now=new Date(),cm=now.getHours()*60+now.getMinutes(),ms=timeToMinutes(d.monitorTime);
         if(cm>=ms && !d.notifiedMonitoring){ showMonitoringPopup(id,d.type,d.time); await updGate(id,{notifiedMonitoring:true,status:'monitoring'}); }
         if(d.type==='arrival'){ const am=timeToMinutes(d.time);
-          if(cm>=am+35 && !d.notifiedDeparture){ showDepartureNotif(`Gate ${id}: opdatér med departure tidspunkt`); await updGate(id,{notifiedDeparture:true,status:'waiting_departure'}); }
+          if(cm>=am+20 && !d.notifiedDeparture){ showDepartureNotif(`Gate ${id}: opdatér med departure tidspunkt`); await updGate(id,{notifiedDeparture:true,status:'waiting_departure'}); }
         }
         if(d.type==='departure'){ const dm=timeToMinutes(d.time);
           if(cm>=dm && !d.completedAt){ await updGate(id,{status:'completed',completedAt:new Date()}); }
