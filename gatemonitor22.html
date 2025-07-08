@@ -15,10 +15,10 @@
     .tab-content.active { display:block; }
     .gate-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:10px; }
 #allGatesTab .gate-grid {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   gap: 10px;
+  overflow: visible; /* valgfrit */
 }
     .gate-item { padding:15px; border-radius:5px; text-align:center; font-weight:bold; color:#fff; cursor:pointer; transition:transform .1s; }
     .gate-item:hover { transform:scale(1.05); }
@@ -131,6 +131,8 @@
       E:['E20','E22','E24']
     };
     let gates = {}, timers = {};
+	let monitoringNotified = false;
+	let departureNotified = false;
     const col = db.collection('sharedGates');
     const setGate = (id,data) => col.doc(id).set(data);
     const updGate = (id,fields) => col.doc(id).update(fields);
@@ -158,23 +160,31 @@
     function addMinutes(s,mins) { return minutesToTime(timeToMinutes(s)+mins); }
 
     function showMonitoringPopup(id,type,time){
+if (monitoringNotified) return;
+  monitoringNotified = true;
+  playSound();
       const p=document.createElement('div');p.className='monitoring-popup';
       p.innerHTML=`<span class='close-btn'>&times;</span>${id} ${type.charAt(0).toUpperCase()+type.slice(1)} ${time} – overvågning begynder nu`;
       document.body.append(p);
       p.querySelector('.close-btn').onclick=()=>p.remove();
       setTimeout(()=>p.remove(),4000);
     }
-    function playSound(){ try{const ac=new (window.AudioContext||window.webkitAudioContext)(),o=ac.createOscillator(),g=ac.createGain();
-      o.connect(g); g.connect(ac.destination);
-      o.frequency.value=800; o.type='sine';
-      g.gain.setValueAtTime(0.3,ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.01,ac.currentTime+0.5);
-      o.start(ac.currentTime); o.stop(ac.currentTime+0.5);
-    }catch{} }
-    function showDepartureNotif(msg){ playSound(); const n=document.createElement('div'); n.className='notification';
-      n.innerHTML=`<strong>Notifikation</strong><br>${msg}<br><button onclick="this.parentNode.remove()">Luk</button>`;
-      document.body.append(n);
-    }
+function showDepartureNotif(msg) {
+  if (departureNotified) return;    // stopper, hvis allerede vist
+  departureNotified = true;         // sæt flag
+
+  playSound();
+  const n = document.createElement('div');
+  n.className = 'notification';
+  n.innerHTML = `
+    <strong>Notifikation</strong><br>
+    ${msg}<br>
+    <button onclick="this.parentNode.remove()">Luk</button>
+  `;
+  document.body.append(n);
+  setTimeout(() => n.remove(), 9000);  // valgfrit: auto-luk efter 9 sek.
+}
+
 
     function setupGateTimer(id,d){
       if(timers[id]) clearInterval(timers[id]);
