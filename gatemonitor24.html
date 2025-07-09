@@ -40,6 +40,8 @@
     .add-btn { padding:8px 12px; border:none; border-radius:5px; cursor:pointer; font-size:14px; margin-left:5px; }
     .add-btn { background:#28a745; color:#fff; }
     .add-btn:hover { background:#218838; }
+    .start-btn { background:#28a745; color:#fff; font-weight:bold; }
+    .start-btn:hover { background:#218838; }
     .reset-btn { background:#dc3545; color:#fff; padding:8px 12px; border:none; border-radius:5px; cursor:pointer; font-size:14px; margin-top:20px; }
     .reset-btn:hover { background:#c82333; }
     .delete-btn { background:#ffc107; color:#000; }
@@ -185,6 +187,14 @@ function showDepartureNotif(msg) {
   setTimeout(() => n.remove(), 9000);  // valgfrit: auto-luk efter 9 sek.
 }
 
+    // NY FUNKTION: Start overvågning med det samme
+    function startMonitoring(id) {
+      updGate(id, {
+        status: 'monitoring',
+        notifiedMonitoring: true
+      });
+      showMonitoringPopup(id, gates[id].type, gates[id].time);
+    }
 
     function setupGateTimer(id,d){
       if(timers[id]) clearInterval(timers[id]);
@@ -253,7 +263,7 @@ act.sort((a, b) => {
   return timeToMinutes(a[1].monitorTime) - timeToMinutes(b[1].monitorTime);
 });
 
-// hvis du også vil sortere “Udelegeret”, kan du tilføje:
+// hvis du også vil sortere "Udelegeret", kan du tilføje:
 delg.sort((a, b) =>
   timeToMinutes(a[1].monitorTime) - timeToMinutes(b[1].monitorTime)
 );
@@ -264,6 +274,12 @@ delg.sort((a, b) =>
         if(d.status==='completed') li.classList.add('completed');
         const typeTxt=d.type==='arrival'?'ARRIVAL':'DEPARTURE';
         let btns=`<button class='delete-btn' onclick="delGate('${id}')">Slet</button>`;
+        
+        // TILFØJ START-KNAP hvis den ikke allerede er startet
+        if(d.status!=='completed' && d.status!=='monitoring'){
+          btns=`<button class='start-btn' onclick="startMonitoring('${id}')">Sæt igang</button>` + btns;
+        }
+        
         if(d.status!=='completed'){
           if(d.type==='arrival') btns+=`<button class='convert-btn' onclick="showConvertToDepartureUI('${id}',this)">Til Dep</button>`;
           btns+=`<button class='add-btn' onclick="onPlus5('${id}')">+5 min</button><button class='finish-btn' onclick="onFinish('${id}')">Færdig</button>`;
