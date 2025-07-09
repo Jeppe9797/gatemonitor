@@ -243,9 +243,16 @@ function timeToMinutes(s) {
         else if(d.screen==='delegated') delg.push([id,d]);
         else act.push([id,d]);
       });
-act.sort((a, b) =>
-  timeToMinutes(a[1].monitorTime) - timeToMinutes(b[1].monitorTime)
-);
+act.sort((a, b) => {
+  // 1) Gates med status "monitoring" øverst
+  const aMon = a[1].status === 'monitoring';
+  const bMon = b[1].status === 'monitoring';
+  if (aMon && !bMon) return -1;
+  if (!aMon && bMon) return 1;
+  // 2) Ellers efter monitorTime
+  return timeToMinutes(a[1].monitorTime) - timeToMinutes(b[1].monitorTime);
+});
+
 // hvis du også vil sortere “Udelegeret”, kan du tilføje:
 delg.sort((a, b) =>
   timeToMinutes(a[1].monitorTime) - timeToMinutes(b[1].monitorTime)
